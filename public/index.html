@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
+    <meta charset="UTF-8" />
     <title>Видео звонок</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
         * { box-sizing: border-box; }
-
         body {
             margin: 0;
             font-family: Arial, sans-serif;
@@ -15,8 +14,8 @@
             flex-direction: column;
             align-items: center;
             padding: 10px;
+            min-height: 100vh;
         }
-
         #videos {
             display: flex;
             flex-wrap: wrap;
@@ -24,16 +23,16 @@
             gap: 10px;
             margin-bottom: 20px;
             width: 100%;
+            max-width: 900px;
         }
-
         video {
             width: 100%;
             max-width: 400px;
             height: auto;
             border: 2px solid #333;
             border-radius: 10px;
+            background: black;
         }
-
         button {
             padding: 12px 20px;
             margin: 5px;
@@ -43,18 +42,35 @@
             cursor: pointer;
             background-color: #4CAF50;
             color: white;
+            min-width: 120px;
         }
-
         button:hover {
             background-color: #45a049;
         }
-
         #shareLink {
             margin-top: 15px;
             text-align: center;
             word-wrap: break-word;
             width: 90%;
-            font-size: 16px;
+            max-width: 900px;
+            font-size: 14px;
+            background: #fff;
+            padding: 10px;
+            border-radius: 8px;
+            border: 1px solid #ddd;
+        }
+        @media (max-width: 600px) {
+            #videos {
+                flex-direction: column;
+                align-items: center;
+            }
+            video {
+                max-width: 100%;
+            }
+            button {
+                width: 100%;
+                max-width: 300px;
+            }
         }
     </style>
 </head>
@@ -65,10 +81,8 @@
     </div>
     <div>
         <button id="startButton">Позвонить</button>
-        <button id="hangupButton">Завершить</button>
+        <button id="hangupButton" disabled>Завершить</button>
     </div>
-    
-    <!-- Сюда будет вставляться ссылка для приглашения -->
     <div id="shareLink"></div>
 
     <script src="script.js"></script>
