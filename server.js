@@ -44,28 +44,18 @@ wss.on('connection', (ws) => {
     });
 });
 
-app.get('/', (req, res) => {
-    res.send(`
-        <html>
-        <head><title>Видеозвонок</title></head>
-        <body style="text-align:center; font-family:sans-serif; margin-top:50px;">
-            <h1>Добро пожаловать</h1>
-            <a href="/call"><button style="font-size:20px;padding:10px 20px;">Создать звонок</button></a>
-        </body>
-        </html>
-    `);
-});
-
+// При заходе на /call создаём комнату и редиректим туда
 app.get('/call', (req, res) => {
     const roomId = uuidv4();
     res.redirect(`/call/${roomId}`);
 });
 
+// Страница звонка по комнате
 app.get('/call/:room', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
 const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => {
-    console.log(`🚀 Сервер запущен: http://localhost:${PORT}`);
+    console.log(`🚀 Сервер запущен на http://localhost:${PORT}`);
 });
