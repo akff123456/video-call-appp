@@ -1,90 +1,177 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-    <meta charset="UTF-8" />
-    <title>Видео звонок</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <style>
-        * { box-sizing: border-box; }
-        body {
-            margin: 0;
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 10px;
-            min-height: 100vh;
-        }
-        #videos {
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            gap: 10px;
-            margin-bottom: 20px;
-            width: 100%;
-            max-width: 900px;
-        }
-        video {
-            width: 100%;
-            max-width: 400px;
-            height: auto;
-            border: 2px solid #333;
-            border-radius: 10px;
-            background: black;
-        }
-        button {
-            padding: 12px 20px;
-            margin: 5px;
-            font-size: 16px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            background-color: #4CAF50;
-            color: white;
-            min-width: 120px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        #shareLink {
-            margin-top: 15px;
-            text-align: center;
-            word-wrap: break-word;
-            width: 90%;
-            max-width: 900px;
-            font-size: 14px;
-            background: #fff;
-            padding: 10px;
-            border-radius: 8px;
-            border: 1px solid #ddd;
-        }
-        @media (max-width: 600px) {
-            #videos {
-                flex-direction: column;
-                align-items: center;
-            }
-            video {
-                max-width: 100%;
-            }
-            button {
-                width: 100%;
-                max-width: 300px;
-            }
-        }
-    </style>
+<meta charset="UTF-8" />
+<title>Видео звонок</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    margin: 0; padding: 20px;
+    background: #f4f4f4;
+  }
+  #videos {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+    flex-wrap: wrap;
+  }
+  video {
+    width: 45vw;
+    max-width: 400px;
+    border-radius: 8px;
+    border: 2px solid #333;
+  }
+  button {
+    margin: 5px;
+    padding: 12px 20px;
+    font-size: 16px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    background-color: #4caf50;
+    color: white;
+  }
+  button:hover {
+    background-color: #45a049;
+  }
+  #shareLink {
+    margin-top: 15px;
+    word-break: break-word;
+  }
+</style>
 </head>
 <body>
-    <div id="videos">
-        <video id="localVideo" autoplay muted playsinline></video>
-        <video id="remoteVideo" autoplay playsinline></video>
-    </div>
-    <div>
-        <button id="startButton">Позвонить</button>
-        <button id="hangupButton" disabled>Завершить</button>
-    </div>
-    <div id="shareLink"></div>
 
-    <script src="script.js"></script>
+<h1>Видео звонок</h1>
+
+<div id="videos">
+  <video id="localVideo" autoplay muted playsinline></video>
+  <video id="remoteVideo" autoplay playsinline></video>
+</div>
+
+<div>
+  <button id="startButton">Позвонить</button>
+  <button id="hangupButton" disabled>Завершить</button>
+</div>
+
+<div id="shareLink"></div>
+
+<script>
+(() => {
+  const startButton = document.getElementById('startButton');
+  const hangupButton = document.getElementById('hangupButton');
+  const localVideo = document.getElementById('localVideo');
+  const remoteVideo = document.getElementById('remoteVideo');
+  const shareLink = document.getElementById('shareLink');
+
+  const roomId = window.location.pathname.split('/').pop();
+
+  // Если на главной странице, редиректим на уникальную комнату
+  if (window.location.pathname === '/' || window.location.pathname === '') {
+    const newRoomId = crypto.randomUUID();
+    window.location.href = `/call/${newRoomId}`;
+    return;
+  }
+
+  // Используем WSS если страница на HTTPS, иначе WS
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const socket = new WebSocket(`${protocol}//${window.location.host}`);
+
+  let localStream = null;
+  let peerConnection = null;
+
+  const configuration = {
+    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+  };
+
+  socket.addEventListener('open', () => {
+    socket.send(JSON.stringify({ type: 'join', room: roomId }));
+    shareLink.innerHTML = `🔗 Отправь эту ссылку, чтобы пригласить собеседника:<br><b>${window.location.href}</b>`;
+  });
+
+  socket.addEventListener('message', async event => {
+    const data = JSON.parse(event.data);
+
+    if (!peerConnection) return;
+
+    switch(data.type) {
+      case 'offer':
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.offer));
+        const answer = await peerConnection.createAnswer();
+        await peerConnection.setLocalDescription(answer);
+        socket.send(JSON.stringify({ type: 'answer', answer }));
+        break;
+
+      case 'answer':
+        await peerConnection.setRemoteDescription(new RTCSessionDescription(data.answer));
+        break;
+
+      case 'candidate':
+        try {
+          await peerConnection.addIceCandidate(new RTCIceCandidate(data.candidate));
+        } catch (e) {
+          console.error('Ошибка добавления ICE кандидата', e);
+        }
+        break;
+
+      case 'hangup':
+        endCall();
+        break;
+    }
+  });
+
+  startButton.onclick = async () => {
+    startButton.disabled = true;
+    hangupButton.disabled = false;
+
+    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+    localVideo.srcObject = localStream;
+
+    peerConnection = new RTCPeerConnection(configuration);
+
+    localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
+
+    peerConnection.onicecandidate = event => {
+      if (event.candidate) {
+        socket.send(JSON.stringify({ type: 'candidate', candidate: event.candidate }));
+      }
+    };
+
+    peerConnection.ontrack = event => {
+      remoteVideo.srcObject = event.streams[0];
+    };
+
+    const offer = await peerConnection.createOffer();
+    await peerConnection.setLocalDescription(offer);
+
+    socket.send(JSON.stringify({ type: 'offer', offer }));
+  };
+
+  hangupButton.onclick = () => {
+    socket.send(JSON.stringify({ type: 'hangup' }));
+    endCall();
+  };
+
+  function endCall() {
+    startButton.disabled = false;
+    hangupButton.disabled = true;
+
+    if (peerConnection) {
+      peerConnection.close();
+      peerConnection = null;
+    }
+    if (localStream) {
+      localStream.getTracks().forEach(track => track.stop());
+      localStream = null;
+    }
+    localVideo.srcObject = null;
+    remoteVideo.srcObject = null;
+  }
+})();
+</script>
+
 </body>
 </html>
